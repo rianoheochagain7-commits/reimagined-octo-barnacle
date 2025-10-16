@@ -1,0 +1,27 @@
+# BootBuys Backend
+# Ignore unnecessary files for Heroku deployment
+
+# iOS/Xcode files
+BootBuys/
+Boot buys.xcworkspace/
+*.xcworkspace
+*.xcodeproj
+*.xcuserstate
+
+# Documentation
+*.md
+app-store-pages/
+
+# macOS
+.DS_Store
+
+# Old backend folder
+stripe-backend/
+
+# Screenshots
+*.png
+*.jpg
+*.jpeg
+
+# Scripts
+*.sh
