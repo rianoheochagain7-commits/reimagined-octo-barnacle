@@ -69,9 +69,9 @@ app.post('/api/payment-intents', async (req, res) => {
         bootPrice: bootPrice.toString(),
         deliveryFee: deliveryFee.toString()
       },
-      automatic_payment_methods: {
-        enabled: true,
-      },
+      // Disable automatic_payment_methods to prevent Apple Pay from appearing
+      // Use explicit payment_method_types instead
+      payment_method_types: ['card', 'link', 'revolut_pay', 'eps'], // Explicitly enable payment methods (Apple Pay removed)
     };
     
     // If seller has Stripe Connect account, use Connect for split payments
