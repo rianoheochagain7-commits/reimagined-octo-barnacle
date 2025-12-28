@@ -629,7 +629,8 @@ app.post('/api/emails/send', async (req, res) => {
         success: true,
         message: 'Email logged (SendGrid not configured)',
         emailPreview: emailText.substring(0, 200) + '...'
-    });
+      });
+    }
     
   } catch (error) {
     console.error('Error sending email:', error);
