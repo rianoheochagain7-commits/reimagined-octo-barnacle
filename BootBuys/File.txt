@@ -1,0 +1,16 @@
+BootBuys
+/Users/rianoheochagain/Desktop/BootBuys-Transfer/BootBuys/BootBuys.xcodeproj Missing package product 'StripePaymentsUI'
+
+/Users/rianoheochagain/Desktop/BootBuys-Transfer/BootBuys/BootBuys.xcodeproj Missing package product 'StripePaymentSheet'
+
+/Users/rianoheochagain/Desktop/BootBuys-Transfer/BootBuys/BootBuys.xcodeproj Missing package product 'FirebaseAnalytics'
+
+/Users/rianoheochagain/Desktop/BootBuys-Transfer/BootBuys/BootBuys.xcodeproj Missing package product 'FirebaseCore'
+
+/Users/rianoheochagain/Desktop/BootBuys-Transfer/BootBuys/BootBuys.xcodeproj Missing package product 'FirebaseStorage'
+
+/Users/rianoheochagain/Desktop/BootBuys-Transfer/BootBuys/BootBuys.xcodeproj Missing package product 'FirebaseAuth'
+
+/Users/rianoheochagain/Desktop/BootBuys-Transfer/BootBuys/BootBuys.xcodeproj Missing package product 'FirebaseFirestore'
+
+/Users/rianoheochagain/Desktop/BootBuys-Transfer/BootBuys/BootBuys.xcodeproj Missing package product 'Stripe'
