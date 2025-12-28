@@ -1,4 +1,4 @@
-# BootBuys Backend
+'# BootBuys Backend
 # Ignore unnecessary files for Heroku deployment
 
 # iOS/Xcode files
@@ -9,7 +9,7 @@ Boot buys.xcworkspace/
 *.xcuserstate
 
 # Documentation
-*.md
+*.md'
 app-store-pages/
 
 # macOS
@@ -25,3 +25,8 @@ stripe-backend/
 
 # Scripts
 *.sh
+
+# Environment variables (contains sensitive keys)
+.env
+.env.local
+.env.*.local

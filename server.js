@@ -2,6 +2,15 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const sgMail = require('@sendgrid/mail');
+
+// Configure SendGrid
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+  console.log('✅ SendGrid configured');
+} else {
+  console.log('⚠️ SendGrid API key not configured - emails will be logged only');
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -472,9 +481,7 @@ app.post('/api/orders/check-auto-complete', async (req, res) => {
   }
 });
 
-// ===== EMAIL NOTIFICATIONS =====
-// Note: For production, configure a proper email service (SendGrid, Mailgun, etc.)
-// For now, this logs the email that would be sent
+// ===== EMAIL NOTIFICATIONS via SendGrid =====
 
 app.post('/api/emails/send', async (req, res) => {
   try {
@@ -484,95 +491,144 @@ app.post('/api/emails/send', async (req, res) => {
     console.log(`   To: ${to}`);
     console.log(`   Subject: ${subject}`);
     console.log(`   Type: ${type}`);
-    console.log(`   Data: ${JSON.stringify(data)}`);
     
-    // Email templates based on type
-    let emailBody = '';
+    // Build HTML email based on type
+    let emailHtml = '';
+    let emailText = '';
+    
+    const headerHtml = `
+      <div style="background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%); padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">⚽ BootBuys</h1>
+      </div>
+    `;
+    
+    const footerHtml = `
+      <div style="background: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #666; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <p>© 2024 BootBuys - The Football Boot Marketplace</p>
+        <p>You received this email because you have an account with BootBuys.</p>
+      </div>
+    `;
+    
     switch (type) {
       case 'order_placed':
-        emailBody = `
-          Hi ${data.buyerName},
-          
-          Your order has been placed successfully!
-          
-          Order Details:
-          - Item: ${data.bootName}
-          - Price: €${data.price}
-          - Order ID: ${data.orderId}
-          
-          The seller will ship your item soon.
-          
-          Thanks for using BootBuys!
+        emailText = `Hi ${data.buyerName}, Your order has been placed! Item: ${data.bootName}, Price: €${data.price}. The seller will ship soon.`;
+        emailHtml = `
+          ${headerHtml}
+          <div style="padding: 30px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            <h2 style="color: #333;">Order Confirmed! ✅</h2>
+            <p>Hi ${data.buyerName},</p>
+            <p>Your order has been placed successfully!</p>
+            <div style="background: #f9f9f9; border-radius: 10px; padding: 20px; margin: 20px 0;">
+              <h3 style="margin-top: 0; color: #FF6B35;">Order Details</h3>
+              <p><strong>Item:</strong> ${data.bootName}</p>
+              <p><strong>Price:</strong> €${data.price}</p>
+              <p><strong>Order ID:</strong> ${data.orderId}</p>
+            </div>
+            <p>The seller will ship your item soon. We'll notify you when it's on its way!</p>
+            <p style="color: #666;">Thanks for using BootBuys! ⚽</p>
+          </div>
+          ${footerHtml}
         `;
         break;
         
       case 'new_sale':
-        emailBody = `
-          Congratulations ${data.sellerName}!
-          
-          You made a sale! 🎉
-          
-          Order Details:
-          - Item: ${data.bootName}
-          - Price: €${data.price}
-          - Buyer: ${data.buyerName}
-          - Order ID: ${data.orderId}
-          
-          Please ship the item as soon as possible.
-          The buyer's address is available in the app.
-          
-          Thanks for selling on BootBuys!
+        emailText = `Congratulations ${data.sellerName}! You made a sale! Item: ${data.bootName}, Price: €${data.price}, Buyer: ${data.buyerName}. Please ship ASAP.`;
+        emailHtml = `
+          ${headerHtml}
+          <div style="padding: 30px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            <h2 style="color: #333;">You Made a Sale! 🎉</h2>
+            <p>Congratulations ${data.sellerName}!</p>
+            <p>Someone just bought your boots!</p>
+            <div style="background: #f9f9f9; border-radius: 10px; padding: 20px; margin: 20px 0;">
+              <h3 style="margin-top: 0; color: #FF6B35;">Sale Details</h3>
+              <p><strong>Item:</strong> ${data.bootName}</p>
+              <p><strong>Price:</strong> €${data.price}</p>
+              <p><strong>Buyer:</strong> ${data.buyerName}</p>
+              <p><strong>Order ID:</strong> ${data.orderId}</p>
+            </div>
+            <p><strong>Next step:</strong> Please ship the item as soon as possible. The buyer's address is available in the app.</p>
+            <p style="color: #666;">Thanks for selling on BootBuys! 💰</p>
+          </div>
+          ${footerHtml}
         `;
         break;
         
       case 'order_shipped':
-        emailBody = `
-          Hi ${data.buyerName},
-          
-          Great news! Your order has been shipped! 📦
-          
-          Order Details:
-          - Item: ${data.bootName}
-          ${data.trackingNumber ? `- Tracking Number: ${data.trackingNumber}` : ''}
-          
-          Once your item arrives, please confirm delivery in the app.
-          
-          Thanks for using BootBuys!
+        emailText = `Hi ${data.buyerName}, Your order has been shipped! Item: ${data.bootName}. ${data.trackingNumber ? 'Tracking: ' + data.trackingNumber : ''} Please confirm delivery when it arrives.`;
+        emailHtml = `
+          ${headerHtml}
+          <div style="padding: 30px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            <h2 style="color: #333;">Your Order is On Its Way! 📦</h2>
+            <p>Hi ${data.buyerName},</p>
+            <p>Great news! Your order has been shipped!</p>
+            <div style="background: #f9f9f9; border-radius: 10px; padding: 20px; margin: 20px 0;">
+              <h3 style="margin-top: 0; color: #FF6B35;">Shipping Details</h3>
+              <p><strong>Item:</strong> ${data.bootName}</p>
+              ${data.trackingNumber ? `<p><strong>Tracking Number:</strong> ${data.trackingNumber}</p>` : ''}
+            </div>
+            <p><strong>Important:</strong> Once your item arrives, please confirm delivery in the app so the seller can be paid.</p>
+            <p style="color: #666;">Thanks for using BootBuys! ⚽</p>
+          </div>
+          ${footerHtml}
         `;
         break;
         
       case 'payment_released':
-        emailBody = `
-          Hi ${data.sellerName},
-          
-          Payment has been released! 💰
-          
-          Order Details:
-          - Item: ${data.bootName}
-          - Amount: €${data.amount}
-          
-          The money will arrive in your bank account within 2-3 business days.
-          
-          Thanks for selling on BootBuys!
+        emailText = `Hi ${data.sellerName}, Payment released! €${data.amount} for ${data.bootName} is on its way to your bank (2-3 business days).`;
+        emailHtml = `
+          ${headerHtml}
+          <div style="padding: 30px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            <h2 style="color: #333;">Payment Released! 💰</h2>
+            <p>Hi ${data.sellerName},</p>
+            <p>The buyer has confirmed delivery and your payment has been released!</p>
+            <div style="background: #d4edda; border-radius: 10px; padding: 20px; margin: 20px 0;">
+              <h3 style="margin-top: 0; color: #28a745;">Payment Details</h3>
+              <p><strong>Item Sold:</strong> ${data.bootName}</p>
+              <p><strong>Amount:</strong> <span style="font-size: 24px; color: #28a745;">€${data.amount}</span></p>
+            </div>
+            <p>The money will arrive in your bank account within <strong>2-3 business days</strong>.</p>
+            <p style="color: #666;">Thanks for selling on BootBuys! 🎉</p>
+          </div>
+          ${footerHtml}
         `;
         break;
         
       default:
-        emailBody = `Email type: ${type}\nData: ${JSON.stringify(data)}`;
+        emailText = `BootBuys notification: ${type}`;
+        emailHtml = `${headerHtml}<div style="padding: 30px;"><p>${JSON.stringify(data)}</p></div>${footerHtml}`;
     }
     
-    console.log(`📧 Email Body:\n${emailBody}`);
-    
-    // TODO: Implement actual email sending with SendGrid/Mailgun
-    // Example with SendGrid:
-    // const sgMail = require('@sendgrid/mail');
-    // sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-    // await sgMail.send({ to, from: 'noreply@bootbuys.com', subject, text: emailBody });
-    
-    res.json({
-      success: true,
-      message: 'Email logged (email service not configured)',
-      emailPreview: emailBody.substring(0, 200) + '...'
+    // Send via SendGrid if configured
+    if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_FROM_EMAIL) {
+      const msg = {
+        to: to,
+        from: {
+          email: process.env.SENDGRID_FROM_EMAIL,
+          name: 'BootBuys'
+        },
+        subject: subject,
+        text: emailText,
+        html: emailHtml,
+      };
+      
+      await sgMail.send(msg);
+      console.log(`✅ Email sent successfully to ${to}`);
+      
+      res.json({
+        success: true,
+        message: 'Email sent successfully',
+        to: to
+      });
+    } else {
+      // Log only if SendGrid not configured
+      console.log(`⚠️ SendGrid not configured - email logged only`);
+      console.log(`📧 Would send to: ${to}`);
+      console.log(`📧 Subject: ${subject}`);
+      
+      res.json({
+        success: true,
+        message: 'Email logged (SendGrid not configured)',
+        emailPreview: emailText.substring(0, 200) + '...'
     });
     
   } catch (error) {

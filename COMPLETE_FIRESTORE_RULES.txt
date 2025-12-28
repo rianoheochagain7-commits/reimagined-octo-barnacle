@@ -1,0 +1,173 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // Helper Functions
+    // ============================================
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // ============================================
+    // BOOTS COLLECTION - Marketplace Listings
+    // ============================================
+    
+    match /boots/{bootId} {
+      // Anyone authenticated can read active boots (for feed)
+      allow read: if isAuthenticated() && resource.data.isActive == true;
+      
+      // Users can read their own boots (even if sold/inactive)
+      allow read: if isAuthenticated() && resource.data.sellerId == request.auth.uid;
+      
+      // Users can create boots (list for sale)
+      allow create: if isAuthenticated() 
+                    && request.resource.data.sellerId == request.auth.uid
+                    && request.resource.data.isActive == true;
+      
+      // Users can update their own boots
+      allow update: if isAuthenticated() 
+                    && resource.data.sellerId == request.auth.uid
+                    && resource.data.sellerId == request.auth.uid;
+      
+      // Buyers can mark boots as sold when purchasing
+      allow update: if isAuthenticated() 
+                    && request.resource.data.buyerId == request.auth.uid
+                    && request.resource.data.isActive == false
+                    && request.resource.data.sellerId == resource.data.sellerId;
+      
+      // Users can delete their own boots
+      allow delete: if isAuthenticated() 
+                    && resource.data.sellerId == request.auth.uid;
+    }
+    
+    // Allow queries on boots collection
+    match /boots/{document=**} {
+      // Allow list queries for active boots (home feed)
+      allow list: if isAuthenticated();
+      
+      // Allow queries filtered by sellerId (profile view)
+      allow get: if isAuthenticated();
+    }
+    
+    // ============================================
+    // USERS COLLECTION - User Profiles
+    // ============================================
+    
+    match /users/{userId} {
+      // Anyone authenticated can read user profiles (for seller info)
+      allow read: if isAuthenticated();
+      
+      // Users can create their own profile
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Users can update their own profile
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Allow updating user stats during purchase or follow actions
+      // This allows buyers to increment seller's soldItemsCount
+      // and their own purchasedItemsCount
+      allow update: if isAuthenticated() 
+                    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['email', 'displayName', 'photoURL', 'uid']));
+    }
+    
+    // ============================================
+    // ORDERS COLLECTION - Purchase History
+    // ============================================
+    
+    match /orders/{orderId} {
+      // Users can read their own orders (as buyer or seller)
+      allow read: if isAuthenticated() 
+                  && (resource.data.buyerId == request.auth.uid 
+                      || resource.data.sellerId == request.auth.uid);
+      
+      // Buyers can create orders when purchasing
+      allow create: if isAuthenticated() 
+                    && request.resource.data.buyerId == request.auth.uid
+                    && request.resource.data.sellerId != null
+                    && request.resource.data.bootId != null;
+      
+      // Users can update their own orders (status updates, etc.)
+      allow update: if isAuthenticated() 
+                    && (resource.data.buyerId == request.auth.uid 
+                        || resource.data.sellerId == request.auth.uid);
+    }
+    
+    // ============================================
+    // UGC MODERATION - Reports & Blocking
+    // ============================================
+    
+    // Reports collection - user reports for moderation
+    match /reports/{reportId} {
+      // Users can create reports
+      allow create: if isAuthenticated() 
+                    && request.resource.data.reporterId == request.auth.uid;
+      
+      // Users can read reports (for admin review)
+      allow read: if isAuthenticated();
+    }
+    
+    // BlockedUsers collection - user blocking
+    match /blockedUsers/{blockId} {
+      // Users can block other users
+      allow create: if isAuthenticated() 
+                    && request.resource.data.userId == request.auth.uid;
+      
+      // Users can read their own blocks
+      allow read: if isAuthenticated() 
+                  && resource.data.userId == request.auth.uid;
+      
+      // Users can unblock (delete their blocks)
+      allow delete: if isAuthenticated() 
+                    && resource.data.userId == request.auth.uid;
+    }
+    
+    // ============================================
+    // SOCIAL FEATURES - Follows
+    // ============================================
+    
+    // Follows collection - follow relationships & teammates
+    match /follows/{followId} {
+      // Anyone authenticated can read follows (to check follow status)
+      allow read: if isAuthenticated();
+      
+      // Users can follow other users
+      allow create: if isAuthenticated() 
+                    && request.resource.data.followerId == request.auth.uid
+                    && request.resource.data.followingId != request.auth.uid;
+      
+      // Users can unfollow (delete their follows)
+      allow delete: if isAuthenticated() 
+                    && resource.data.followerId == request.auth.uid;
+    }
+    
+    // ============================================
+    // MESSAGING - Conversations & Messages
+    // ============================================
+    
+    // Conversations collection - chat conversations
+    match /conversations/{conversationId} {
+      // SIMPLIFIED: Allow any authenticated user to read/write conversations
+      // (More permissive for testing - can tighten later)
+      allow read, write: if isAuthenticated();
+      
+      // Messages subcollection
+      match /messages/{messageId} {
+        // SIMPLIFIED: Allow any authenticated user to read/write messages
+        // (More permissive for testing - can tighten later)
+        allow read, write: if isAuthenticated();
+      }
+    }
+  }
+}
+
+
+
+
+
+
+
+

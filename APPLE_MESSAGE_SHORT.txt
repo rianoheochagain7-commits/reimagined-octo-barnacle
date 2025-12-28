@@ -1,0 +1,27 @@
+Thank you for your feedback regarding the In-App Controls selection in our Age Rating.
+
+Our app does include both Parental Controls and Age Assurance mechanisms. Here's how to locate them:
+
+Parental Controls Location:
+1. Sign in to the app (or create an account if needed)
+2. Navigate to the Profile tab (bottom navigation bar - person icon)
+3. Tap on the Settings button (gear icon in the top right corner of the Profile screen)
+4. Scroll down to the "Privacy & Security" section
+5. Tap on "Parental Controls" (with shield icon: person.2.shield.checkered.fill)
+6. Here you can enable/disable parental controls, set passwords, configure spending limits, and manage messaging restrictions
+
+Age Assurance Mechanism:
+- During account creation (Sign Up process), users are required to provide their Date of Birth in Step 2 of 4
+- The app validates that users are at least 13 years old before allowing account creation
+- This age verification is enforced during the signup flow and prevents users under 13 from creating accounts
+
+Additional Information:
+- Parental Guide: Also accessible from Settings > Support section > "Parental Guide" - provides comprehensive information for parents about the app's safety features and age appropriateness
+- The Parental Controls feature includes: password protection, purchase restrictions, messaging restrictions, and spending limits
+
+If you have any difficulty locating these features, please let me know and I can provide additional guidance or screenshots.
+
+Thank you for your review.
+
+
+

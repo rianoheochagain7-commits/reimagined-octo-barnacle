@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: bootbuys-stripe-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: STRIPE_SECRET_KEY
+        sync: false  # Set this in Render dashboard manually
+      - key: PORT
+        value: 10000
