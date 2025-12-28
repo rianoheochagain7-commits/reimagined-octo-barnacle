@@ -1,5 +1,8 @@
-'# BootBuys Backend
-# Ignore unnecessary files for Heroku deployment
+# BootBuys Backend
+# Ignore unnecessary files for deployment
+
+# Dependencies
+node_modules/
 
 # iOS/Xcode files
 BootBuys/
@@ -8,8 +11,7 @@ Boot buys.xcworkspace/
 *.xcodeproj
 *.xcuserstate
 
-# Documentation
-*.md'
+# Documentation (optional - remove if you want to track docs)
 app-store-pages/
 
 # macOS
