@@ -137,6 +137,37 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// Debug endpoint to check seller account status
+app.get('/api/debug/seller/:accountId', async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    console.log(`🔍 DEBUG: Checking seller account: ${accountId}`);
+    
+    if (!accountId || !accountId.startsWith('acct_')) {
+      return res.json({ 
+        valid: false, 
+        error: 'Invalid account ID format',
+        received: accountId 
+      });
+    }
+    
+    const account = await stripe.accounts.retrieve(accountId);
+    res.json({
+      valid: true,
+      accountId: account.id,
+      charges_enabled: account.charges_enabled,
+      payouts_enabled: account.payouts_enabled,
+      details_submitted: account.details_submitted,
+      requirements: account.requirements?.currently_due || []
+    });
+  } catch (error) {
+    res.json({ 
+      valid: false, 
+      error: error.message 
+    });
+  }
+});
+
 // ===== STRIPE CONNECT ENDPOINTS =====
 
 // Create Connect Account for sellers
