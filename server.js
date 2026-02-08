@@ -55,25 +55,21 @@ app.post('/api/payment-intents', async (req, res) => {
     // Calculate platform fee (7% for all boots - fee only on boot price, not delivery)
     const platformFeePercentage = 0.07; // 7% for all boots
     const platformFee = Math.round(amount * platformFeePercentage * 100); // Convert to cents
-    const sellerAmount = Math.round(amount * 100) - platformFee; // Seller gets boot price minus fee
     const totalAmount = Math.round(amount * 100) + Math.round((deliveryFee || 0) * 100); // Total with delivery
-    
-    // Calculate what seller receives: (boot price - platform fee) + delivery fee
-    const sellerReceives = sellerAmount + Math.round((deliveryFee || 0) * 100);
+    const sellerReceives = totalAmount - platformFee; // Seller gets total minus platform fee
     
     console.log(`💰 Using Stripe Connect for seller: ${sellerStripeAccountId}`);
     console.log(`💰 Payment split: Total=${totalAmount}c, Platform Fee=${platformFee}c (7%), Seller Receives=${sellerReceives}c`);
     
     // PaymentIntent configuration with Connect
+    // Use application_fee_amount - Stripe automatically transfers the rest to the seller
     const paymentIntentParams = {
       amount: totalAmount, // Total amount buyer pays (boot price + delivery)
       currency: currency,
       capture_method: 'manual', // Hold payment in escrow until delivery confirmed
-      on_behalf_of: sellerStripeAccountId,
-      application_fee_amount: platformFee, // Platform fee goes to your account (7%)
+      application_fee_amount: platformFee, // Platform fee goes to BootBuys (7%)
       transfer_data: {
-        destination: sellerStripeAccountId,
-        amount: sellerReceives // Seller receives: (boot price - fee) + delivery fee
+        destination: sellerStripeAccountId // Seller receives the rest automatically
       },
       metadata: {
         ...metadata,
@@ -81,11 +77,11 @@ app.post('/api/payment-intents', async (req, res) => {
         sellerStripeAccountId: sellerStripeAccountId,
         platformFee: platformFee.toString(),
         platformFeePercentage: '7',
-        sellerAmount: sellerReceives.toString(),
+        sellerReceives: sellerReceives.toString(),
         bootPrice: Math.round(amount * 100).toString(),
         deliveryFee: Math.round((deliveryFee || 0) * 100).toString()
       },
-      payment_method_types: ['card'] // Explicitly use card payments
+      payment_method_types: ['card']
     };
     
     const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
