@@ -85,9 +85,7 @@ app.post('/api/payment-intents', async (req, res) => {
         bootPrice: Math.round(amount * 100).toString(),
         deliveryFee: Math.round((deliveryFee || 0) * 100).toString()
       },
-      automatic_payment_methods: {
-        enabled: true,
-      }
+      payment_method_types: ['card'] // Explicitly use card payments
     };
     
     const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
