@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '1mb' })); // Limit payload for 100+ user scale
 
 // Create PaymentIntent endpoint with Connect support
 app.post('/api/payment-intents', async (req, res) => {
@@ -59,7 +59,13 @@ app.post('/api/payment-intents', async (req, res) => {
     const sellerReceives = totalAmount - platformFee; // Seller gets total minus platform fee
     
     console.log(`💰 Using Stripe Connect for seller: ${sellerStripeAccountId}`);
-    console.log(`💰 Payment split: Total=${totalAmount}c, Platform Fee=${platformFee}c (7%), Seller Receives=${sellerReceives}c`);
+    console.log(`💰 ===== PAYMENT BREAKDOWN =====`);
+    console.log(`💰 Boot Price: €${amount.toFixed(2)}`);
+    console.log(`💰 Delivery Fee: €${(deliveryFee || 0).toFixed(2)}`);
+    console.log(`💰 BootBuys Fee (7% of boot): €${(platformFee / 100).toFixed(2)}`);
+    console.log(`💰 Buyer Pays Total: €${(totalAmount / 100).toFixed(2)}`);
+    console.log(`💰 Seller Receives (before Stripe fees): €${(sellerReceives / 100).toFixed(2)}`);
+    console.log(`💰 ===============================`);
     
     // PaymentIntent configuration with Connect
     // Use application_fee_amount - Stripe automatically transfers the rest to the seller
@@ -195,6 +201,33 @@ app.post('/api/connect/account-links', async (req, res) => {
   try {
     const { accountId, refreshUrl, returnUrl } = req.body;
     
+    if (!accountId || typeof accountId !== 'string') {
+      return res.status(400).json({ error: 'accountId is required' });
+    }
+    if (!accountId.startsWith('acct_')) {
+      return res.status(400).json({ error: 'Invalid Stripe account format' });
+    }
+
+    // Ensure account has capabilities required for account_onboarding (fixes legacy accounts)
+    try {
+      const account = await stripe.accounts.retrieve(accountId);
+      const caps = account.capabilities || {};
+      const needsUpdate = !caps.card_payments?.requested || !caps.transfers?.requested;
+      if (needsUpdate) {
+        await stripe.accounts.update(accountId, {
+          capabilities: {
+            card_payments: { requested: true },
+            transfers: { requested: true },
+          },
+        });
+        console.log(`Updated capabilities for account ${accountId}`);
+      }
+    } catch (retrieveErr) {
+      console.error('Account retrieve/update failed:', retrieveErr);
+      const msg = retrieveErr.code === 'resource_missing' ? 'Stripe account not found. Please connect with Stripe again.' : retrieveErr.message;
+      return res.status(500).json({ error: msg });
+    }
+    
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
       refresh_url: refreshUrl || 'bootbuys://stripe-refresh',
@@ -202,12 +235,24 @@ app.post('/api/connect/account-links', async (req, res) => {
       type: 'account_onboarding',
     });
     
-    res.json({
-      url: accountLink.url
-    });
+    if (!accountLink?.url) {
+      throw new Error('Stripe did not return an onboarding URL');
+    }
+    
+    res.json({ url: accountLink.url });
   } catch (error) {
     console.error('Error creating account link:', error);
-    res.status(500).json({ error: error.message });
+    const code = error.code || error.type;
+    const rawMsg = (error.message || String(error)).toLowerCase();
+    let msg = 'Failed to create Stripe link. Please try again.';
+    if (code === 'resource_missing' || rawMsg.includes('no such account')) {
+      msg = 'Stripe account not found. Please tap "Connect with Stripe" to set up again.';
+    } else if (rawMsg.includes('capabilities')) {
+      msg = 'Account setup issue. Please try again.';
+    } else if (rawMsg.includes('invalid') || rawMsg.includes('invalid_request')) {
+      msg = 'Invalid Stripe account. Please connect with Stripe again.';
+    }
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -392,6 +437,11 @@ app.post('/api/payments/refund', async (req, res) => {
     console.error('Error processing refund:', error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// Health check for load balancers / monitoring (100+ user scale)
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 app.listen(PORT, () => {
