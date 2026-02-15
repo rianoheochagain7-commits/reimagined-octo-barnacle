@@ -200,6 +200,7 @@ app.post('/api/connect/accounts', async (req, res) => {
 app.post('/api/connect/account-links', async (req, res) => {
   try {
     const { accountId, refreshUrl, returnUrl } = req.body;
+    console.log('POST /api/connect/account-links', accountId ? `${accountId.substring(0, 12)}...` : 'no accountId');
     
     if (!accountId || typeof accountId !== 'string') {
       return res.status(400).json({ error: 'accountId is required' });
@@ -208,26 +209,29 @@ app.post('/api/connect/account-links', async (req, res) => {
       return res.status(400).json({ error: 'Invalid Stripe account format' });
     }
 
-    // Ensure account has capabilities required for account_onboarding (fixes legacy accounts)
+    // Optional: ensure account has capabilities (helps legacy accounts). Don't block on any pre-check.
     try {
       const account = await stripe.accounts.retrieve(accountId);
       const caps = account.capabilities || {};
       const needsUpdate = !caps.card_payments?.requested || !caps.transfers?.requested;
       if (needsUpdate) {
-        await stripe.accounts.update(accountId, {
-          capabilities: {
-            card_payments: { requested: true },
-            transfers: { requested: true },
-          },
-        });
-        console.log(`Updated capabilities for account ${accountId}`);
+        try {
+          await stripe.accounts.update(accountId, {
+            capabilities: {
+              card_payments: { requested: true },
+              transfers: { requested: true },
+            },
+          });
+          console.log(`Updated capabilities for account ${accountId}`);
+        } catch (updateErr) {
+          console.warn('Capability update skipped:', updateErr.message);
+        }
       }
     } catch (retrieveErr) {
-      console.error('Account retrieve/update failed:', retrieveErr);
-      const msg = retrieveErr.code === 'resource_missing' ? 'Stripe account not found. Please connect with Stripe again.' : retrieveErr.message;
-      return res.status(500).json({ error: msg });
+      console.warn('Pre-check skipped:', retrieveErr.message);
     }
-    
+
+    console.log(`Creating account link for ${accountId.substring(0, 12)}...`);
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
       refresh_url: refreshUrl || 'bootbuys://stripe-refresh',
@@ -241,16 +245,18 @@ app.post('/api/connect/account-links', async (req, res) => {
     
     res.json({ url: accountLink.url });
   } catch (error) {
-    console.error('Error creating account link:', error);
-    const code = error.code || error.type;
-    const rawMsg = (error.message || String(error)).toLowerCase();
+    const rawMsg = error.message || String(error);
+    console.error('Account link error:', error.code, rawMsg);
     let msg = 'Failed to create Stripe link. Please try again.';
-    if (code === 'resource_missing' || rawMsg.includes('no such account')) {
-      msg = 'Stripe account not found. Please tap "Connect with Stripe" to set up again.';
-    } else if (rawMsg.includes('capabilities')) {
-      msg = 'Account setup issue. Please try again.';
-    } else if (rawMsg.includes('invalid') || rawMsg.includes('invalid_request')) {
-      msg = 'Invalid Stripe account. Please connect with Stripe again.';
+    const lower = rawMsg.toLowerCase();
+    if (error.code === 'resource_missing' || lower.includes('no such account')) {
+      msg = 'Stripe account not found. Tap "Connect with Stripe" to set up again.';
+    } else if (lower.includes('capabilities')) {
+      msg = 'Account setup issue. Try again or reconnect Stripe.';
+    } else if (lower.includes('invalid') || lower.includes('invalid_request')) {
+      msg = 'Invalid Stripe account. Reconnect Stripe in Settings.';
+    } else if (rawMsg) {
+      msg = rawMsg;
     }
     res.status(500).json({ error: msg });
   }
