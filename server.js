@@ -137,6 +137,14 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// Stripe Connect redirect routes - Stripe requires HTTPS URLs, we redirect to app deep link
+app.get('/stripe-return', (req, res) => {
+  res.redirect(302, 'bootbuys://stripe-return');
+});
+app.get('/stripe-refresh', (req, res) => {
+  res.redirect(302, 'bootbuys://stripe-refresh');
+});
+
 // Debug endpoint to check seller account status
 app.get('/api/debug/seller/:accountId', async (req, res) => {
   try {
@@ -231,11 +239,14 @@ app.post('/api/connect/account-links', async (req, res) => {
       console.warn('Pre-check skipped:', retrieveErr.message);
     }
 
+    const baseUrl = process.env.RENDER_EXTERNAL_URL || 'https://reimagined-octo-barnacle.onrender.com';
+    const returnUrlHttps = `${baseUrl}/stripe-return`;
+    const refreshUrlHttps = `${baseUrl}/stripe-refresh`;
     console.log(`Creating account link for ${accountId.substring(0, 12)}...`);
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
-      refresh_url: refreshUrl || 'bootbuys://stripe-refresh',
-      return_url: returnUrl || 'bootbuys://stripe-return',
+      refresh_url: refreshUrlHttps,
+      return_url: returnUrlHttps,
       type: 'account_onboarding',
     });
     
@@ -253,8 +264,8 @@ app.post('/api/connect/account-links', async (req, res) => {
       msg = 'Stripe account not found. Tap "Connect with Stripe" to set up again.';
     } else if (lower.includes('capabilities')) {
       msg = 'Account setup issue. Try again or reconnect Stripe.';
-    } else if (lower.includes('invalid') || lower.includes('invalid_request')) {
-      msg = 'Invalid Stripe account. Reconnect Stripe in Settings.';
+    } else if (lower.includes('invalid') || lower.includes('invalid_request') || error.code === 'url_invalid') {
+      msg = 'Invalid Stripe account or URL. Reconnect Stripe in Settings.';
     } else if (rawMsg) {
       msg = rawMsg;
     }
