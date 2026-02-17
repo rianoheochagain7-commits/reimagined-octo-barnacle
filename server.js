@@ -273,6 +273,28 @@ app.post('/api/connect/account-links', async (req, res) => {
   }
 });
 
+// Create login link for Express Dashboard
+app.post('/api/connect/login-link', async (req, res) => {
+  try {
+    const { accountId } = req.body;
+    if (!accountId || typeof accountId !== 'string' || !accountId.startsWith('acct_')) {
+      return res.status(400).json({ error: 'Valid accountId is required' });
+    }
+    console.log('POST /api/connect/login-link', accountId ? `${accountId.substring(0, 12)}...` : 'no accountId');
+    const loginLink = await stripe.accounts.createLoginLink(accountId);
+    if (!loginLink?.url) {
+      throw new Error('Stripe did not return a login URL');
+    }
+    res.json({ url: loginLink.url });
+  } catch (error) {
+    const msg = error.message || 'Failed to create dashboard link';
+    const code = error.type || error.code || 'unknown';
+    console.error('Login link error:', code, msg);
+    if (error.raw) console.error('Stripe raw:', JSON.stringify(error.raw).slice(0, 500));
+    res.status(500).json({ error: msg });
+  }
+});
+
 // Get account status
 app.get('/api/connect/accounts/:accountId', async (req, res) => {
   try {
